@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Trail.API.Infrastructure.Data;
 using TrailHub.API.Application.Interfaces;
 using TrailHub.API.Application.Services;
 using TrailHub.API.Infrastructure.Data;
@@ -50,7 +51,14 @@ namespace TrailHub.API
             app.UseCors("AllowAngular");
             app.UseAuthorization();
             app.MapControllers();
+            using (var scope = app.Services.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                dbContext.Database.Migrate(); // Применяет миграции, если они не применены
 
+                // Заполняем тестовыми данными
+                SeedData.Initialize(dbContext);
+            }
             app.Run();
         }
     }
