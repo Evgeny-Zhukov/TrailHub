@@ -1,4 +1,5 @@
-﻿using NetTopologySuite.Geometries;
+﻿using Bogus;
+using NetTopologySuite.Geometries;
 using TrailHub.API.Domain.Entities;
 using TrailHub.API.Domain.Enums;
 using TrailHub.API.Infrastructure.Data;
@@ -7,112 +8,85 @@ namespace Trail.API.Infrastructure.Data;
 
 public static class SeedData
 {
-    public static void Initialize(AppDbContext context)
+    // Добавляем параметры для управления объемом
+    public static void Initialize(AppDbContext context, int userCount = 500, int routeCount = 10000)
     {
-        // Проверяем, есть ли уже данные
         if (context.Users.Any() || context.Routes.Any())
         {
             return; // DB already seeded
         }
 
-        // Создаем тестового пользователя
-        var user = new User
-        {
-            Login = "testuser",
-            Email = "test@example.com",
-            PasswordHash = "hashed_password_placeholder", // В реальности здесь будет хэш
-            Name = "Иван Тестов",
-            AvatarUrl = null,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        context.Users.Add(user);
-        context.SaveChanges();
-
-        // Создаем тестовые маршруты
         var geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
-        // Маршрут 1: Простой маршрут вокруг Москвы
-        var route1Points = new[]
-        {
-            new Coordinate(37.6173, 55.7558), // Красная площадь
-            new Coordinate(37.6200, 55.7600), // Парк Горького
-            new Coordinate(37.6250, 55.7650), // Воробьевы горы
-        };
-        var route1Geometry = geometryFactory.CreateLineString(route1Points);
+        var regions = new[] { "Москва", "Санкт-Петербург", "Кавказ", "Алтай", "Урал", "Карелия", "Камчатка" };
+        var tagsPool = new[] { "горы", "лес", "река", "озеро", "город", "прогулка", "сложный", "история", "зимний", "семейный" };
+        var seasons = new[] { "лето", "весна", "осень", "зима" };
 
-        var route1 = new TrailHub.API.Domain.Entities.Route
-        {
-            AuthorId = user.Id,
-            Title = "Прогулка по центру Москвы",
-            Difficulty = DifficultyLevel.Level1,
-            Tags = new[] { "город", "прогулка", "история" },
-            Season = new[] { "лето", "весна", "осень" },
-            Description = "Легкая прогулка по историческому центру Москвы. Подходит для всей семьи.",
-            Region = "Москва",
-            DistanceKm = 5.2m,
-            CoverPhotoUrl = null,
-            IsPublished = true,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            TrackGeometry = route1Geometry,
-            ElevationProfile = new decimal[] { 120, 125, 130 }
-        };
+        // Фиксированный Seed для воспроизводимости тестов
+        Randomizer.Seed = new Random(8675309);
 
-        // Маршрут 2: Горный маршрут (Кавказ)
-        var route2Points = new[]
-        {
-            new Coordinate(42.4375, 43.3500), // Домбай
-            new Coordinate(42.4400, 43.3550), // Перевал
-            new Coordinate(42.4450, 43.3600), // Озеро
-            new Coordinate(42.4500, 43.3650), // Вершина
-        };
-        var route2Geometry = geometryFactory.CreateLineString(route2Points);
+        // 1. Генерация пользователей
+        var userFaker = new Faker<User>()
+            .RuleFor(u => u.Login, f => f.Internet.UserName())
+            .RuleFor(u => u.Email, f => f.Internet.Email())
+            .RuleFor(u => u.PasswordHash, f => f.Internet.Password())
+            .RuleFor(u => u.Name, f => f.Name.FullName())
+            .RuleFor(u => u.CreatedAt, f => f.Date.Past(2));
 
-        var route2 = new TrailHub.API.Domain.Entities.Route
-        {
-            AuthorId = user.Id,
-            Title = "Домбай - озеро Азек",
-            Difficulty = DifficultyLevel.Level4,
-            Tags = new[] { "горы", "озеро", "сложный" },
-            Season = new[] { "лето" },
-            Description = "Сложный горный маршрут с набором высоты 1200 метров. Требуется хорошая физическая подготовка.",
-            Region = "Кавказ",
-            DistanceKm = 18.5m,
-            CoverPhotoUrl = null,
-            IsPublished = true,
-            CreatedAt = DateTime.UtcNow.AddDays(-2),
-            UpdatedAt = DateTime.UtcNow.AddDays(-2),
-            TrackGeometry = route2Geometry,
-            ElevationProfile = new decimal[] { 1600, 1800, 2100, 2400, 2800 }
-        };
+        var users = userFaker.Generate(userCount);
+        context.Users.AddRange(users);
+        context.SaveChanges(); // Сохраняем, чтобы получить Id
 
-        // Маршрут 3: Неопубликованный (для проверки фильтрации)
-        var route3Points = new[]
-        {
-            new Coordinate(30.3150, 59.9390), // Санкт-Петербург
-            new Coordinate(30.3200, 59.9450),
-        };
-        var route3Geometry = geometryFactory.CreateLineString(route3Points);
+        // 2. Генерация маршрутов
+        var routeFaker = new Faker<TrailHub.API.Domain.Entities.Route>()
+            .RuleFor(r => r.AuthorId, f => f.PickRandom(users).Id)
+            .RuleFor(r => r.Title, f => f.Lorem.Sentence(3).TrimEnd('.'))
+            .RuleFor(r => r.Difficulty, f => f.PickRandom<DifficultyLevel>())
+            .RuleFor(r => r.Tags, f => f.Make(f.Random.Int(1, 5), () => f.PickRandom(tagsPool)).ToArray())
+            .RuleFor(r => r.Season, f => f.Make(f.Random.Int(1, 4), () => f.PickRandom(seasons)).ToArray())
+            .RuleFor(r => r.Description, f => f.Lorem.Paragraphs(2))
+            .RuleFor(r => r.Region, f => f.PickRandom(regions))
+            .RuleFor(r => r.DistanceKm, f => (decimal)Math.Round(f.Random.Double(1.0, 80.0), 1))
+            .RuleFor(r => r.IsPublished, f => f.Random.Bool(0.95f)) // 95% опубликовано
+            .RuleFor(r => r.CreatedAt, f => f.Date.Past(1))
+            .RuleFor(r => r.UpdatedAt, (f, r) => r.CreatedAt.AddDays(f.Random.Int(0, 30)))
+            .RuleFor(r => r.TrackGeometry, f =>
+            {
+                // Генерируем реалистичный LineString (трек) в пределах РФ/СНГ
+                var pointsCount = f.Random.Int(10, 100);
+                var baseLon = f.Random.Double(30.0, 150.0); // Долгота
+                var baseLat = f.Random.Double(45.0, 65.0);  // Широта
 
-        var route3 = new TrailHub.API.Domain.Entities.Route
-        {
-            AuthorId = user.Id,
-            Title = "Черновик: Питер",
-            Difficulty = DifficultyLevel.Level1,
-            Tags = new[] { "город" },
-            Season = new[] { "лето" },
-            Description = "Этот маршрут еще не опубликован.",
-            Region = "Санкт-Петербург",
-            DistanceKm = 3.0m,
-            IsPublished = false, // Не опубликован!
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            TrackGeometry = route3Geometry,
-            ElevationProfile = new decimal[] { 10, 12 }
-        };
+                var coords = new Coordinate[pointsCount];
+                for (int i = 0; i < pointsCount; i++)
+                {
+                    // Небольшой дрифт координат для создания линии
+                    coords[i] = new Coordinate(
+                        baseLon + f.Random.Double(-0.5, 0.5),
+                        baseLat + f.Random.Double(-0.5, 0.5)
+                    );
+                }
+                return geometryFactory.CreateLineString(coords);
+            })
+            .RuleFor(r => r.ElevationProfile, f =>
+            {
+                var count = f.Random.Int(20, 100);
+                var baseHeight = f.Random.Double(100, 2500);
+                var profile = new decimal[count];
+                for (int i = 0; i < count; i++)
+                {
+                    profile[i] = (decimal)Math.Round(baseHeight + f.Random.Double(-50, 50), 1);
+                }
+                return profile;
+            });
 
-        context.Routes.AddRange(route1, route2, route3);
+        var routes = routeFaker.Generate(routeCount);
+
+        // Совет: Для вставки >10k записей используйте ExecuteInsert (EF Core 7+) 
+        // или Npgsql COPY, чтобы не грузить ChangeTracker.
+        context.Routes.AddRange(routes);
         context.SaveChanges();
+
+        Console.WriteLine($"Seeded {users.Count} users and {routes.Count} routes.");
     }
 }
