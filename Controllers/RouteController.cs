@@ -115,7 +115,7 @@ public class RouteController : ControllerBase
     [HttpPost("upload-gpx")]
     [Authorize]
     [RequestSizeLimit(10 * 1024 * 1024)] // 10 MB
-    public async IActionResult UploadGpx(IFormFile file, [FromForm] string? name, [FromForm] string? description)
+    public async Task<IActionResult> UploadGpx(IFormFile file, [FromForm] string? name, [FromForm] string? description)
     {
         if (file == null || file.Length == 0)
             return BadRequest("Файл не найден.");
@@ -123,16 +123,22 @@ public class RouteController : ControllerBase
         if (!Path.GetExtension(file.FileName).Equals(".gpx", StringComparison.OrdinalIgnoreCase))
             return BadRequest("Неверный формат файла. Требуется .gpx");
 
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var userGuid))
-            return Unauthorized("Не удалось определить пользователя.");
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Unauthorized(new { message = "Не удалось определить пользователя" });
+        }
 
         try
         {
             using var stream = file.OpenReadStream();
-            var route = await _routeService.CreateRouteFromGpxAsync(userGuid, stream, name, description);
+            var route = await _routeService.CreateRouteFromGpxAsync(userId, stream, name, description);
 
-            return Ok(_mapper.Map<Domain.Entities.Route>(route));
+            return Ok(new
+            {
+                message = "Маршрут успешно создан из GPX",
+                routeId = route.Id
+            });
         }
         catch (ArgumentException ex)
         {

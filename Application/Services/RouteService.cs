@@ -175,19 +175,23 @@ public class RouteService : IRouteService
         return true;
     }
 
-    public async Task<Domain.Entities.Route> CreateRouteFromGpxAsync(Guid userId, Stream gpxStream, string? name, string? description)
+    public async Task<Domain.Entities.Route> CreateRouteFromGpxAsync(int userId, Stream gpxStream, string? name, string? description)
     {
         var (lineString, elevationProfile, distance) = await _gpxParser.ParseGpxAsync(gpxStream);
 
         var route = new Domain.Entities.Route
         {
-            Id = Guid.NewGuid(),
             AuthorId = userId,
-            Name = name ?? "Маршрут из GPX",
-            Description = description,
-            Geometry = lineString,
+            Title = name ?? "Маршрут из GPX",
+            Description = description ?? string.Empty,
+            Difficulty = Domain.Enums.DifficultyLevel.Medium, // Значение по умолчанию
+            Tags = Array.Empty<string>(),
+            Season = Array.Empty<string>(),
+            Region = string.Empty,
+            TrackGeometry = lineString,
             ElevationProfile = elevationProfile,
             DistanceKm = (decimal)distance,
+            IsPublished = false,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
