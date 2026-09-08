@@ -1,4 +1,6 @@
+using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TrailHub.API.Application.DTOs;
@@ -12,6 +14,7 @@ namespace TrailHub.API.Controllers;
 public class RouteController : ControllerBase
 {
     private readonly IRouteService _routeService;
+    private readonly IMapper _mapper;
 
     public RouteController(IRouteService routeService)
     {
@@ -107,5 +110,43 @@ public class RouteController : ControllerBase
             return NotFound(new { message = "Маршрут не найден или у вас нет прав на удаление" });
 
         return Ok(new { message = "Маршрут удален" });
+    }
+
+    [HttpPost("upload-gpx")]
+    [Authorize]
+    [RequestSizeLimit(10 * 1024 * 1024)] // 10 MB
+    public async Task<IActionResult> UploadGpx(IFormFile file, [FromForm] string? name, [FromForm] string? description)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("Файл не найден.");
+
+        if (!Path.GetExtension(file.FileName).Equals(".gpx", StringComparison.OrdinalIgnoreCase))
+            return BadRequest("Неверный формат файла. Требуется .gpx");
+
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Unauthorized(new { message = "Не удалось определить пользователя" });
+        }
+
+        try
+        {
+            using var stream = file.OpenReadStream();
+            var route = await _routeService.CreateRouteFromGpxAsync(userId, stream, name, description);
+
+            return Ok(new
+            {
+                message = "Маршрут успешно создан из GPX",
+                routeId = route.Id
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Ошибка обработки файла: {ex.Message}");
+        }
     }
 }

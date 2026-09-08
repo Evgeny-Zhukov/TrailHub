@@ -10,4 +10,5 @@ public interface IRouteService
     Task<int> CreateRouteAsync(CreateRouteDto dto, int userId);
     Task<bool> UpdateRouteAsync(int id, CreateRouteDto dto, int userId);
     Task<bool> DeleteRouteAsync(int id, int userId);
+    Task<Domain.Entities.Route> CreateRouteFromGpxAsync(int userId, Stream gpxStream, string? name, string? description);
 }

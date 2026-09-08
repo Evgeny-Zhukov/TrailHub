@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -6,6 +7,8 @@ using Trail.API.Infrastructure.Data;
 using TrailHub.API.Application.Interfaces;
 using TrailHub.API.Application.Services;
 using TrailHub.API.Infrastructure.Data;
+using TrailHub.Application.Services;
+using TrailHub.Application.Validators;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,13 +29,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IHashingService, HashingService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRouteService, RouteService>();
+builder.Services.AddScoped<IGpxParserService, GpxParserService>();
 
 // 4. Настройка JWT-аутентификации
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var secretKey = jwtSettings["Key"]!;
 var issuer = jwtSettings["Issuer"]!;
 var audience = jwtSettings["Audience"]!;
-
+builder.Services.AddValidatorsFromAssemblyContaining<GpxUploadDtoValidator>();
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

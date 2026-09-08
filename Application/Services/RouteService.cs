@@ -2,6 +2,7 @@
 using NetTopologySuite.Geometries;
 using TrailHub.API.Application.DTOs;
 using TrailHub.API.Infrastructure.Data;
+using TrailHub.Application.Services;
 
 namespace TrailHub.API.Application.Services;
 
@@ -9,8 +10,11 @@ public class RouteService : IRouteService
 {
     private readonly AppDbContext _context;
     private readonly GeometryFactory _geometryFactory;
+    private readonly IGpxParserService _gpxParser;
 
-    public RouteService(AppDbContext context)
+    public RouteService(
+        AppDbContext context,
+        IGpxParserService gpxParser)
     {
         _context = context;
         // Создаем фабрику геометрии с SRID 4326 (WGS84)
@@ -169,5 +173,32 @@ public class RouteService : IRouteService
         _context.Routes.Remove(route);
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<Domain.Entities.Route> CreateRouteFromGpxAsync(int userId, Stream gpxStream, string? name, string? description)
+    {
+        var (lineString, elevationProfile, distance) = await _gpxParser.ParseGpxAsync(gpxStream);
+
+        var route = new Domain.Entities.Route
+        {
+            AuthorId = userId,
+            Title = name ?? "Маршрут из GPX",
+            Description = description ?? string.Empty,
+            Difficulty = Domain.Enums.DifficultyLevel.Medium, // Значение по умолчанию
+            Tags = Array.Empty<string>(),
+            Season = Array.Empty<string>(),
+            Region = string.Empty,
+            TrackGeometry = lineString,
+            ElevationProfile = elevationProfile,
+            DistanceKm = (decimal)distance,
+            IsPublished = false,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.Routes.Add(route);
+        await _context.SaveChangesAsync();
+
+        return route;
     }
 }
