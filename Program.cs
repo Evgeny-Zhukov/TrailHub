@@ -87,3 +87,5 @@ app.UseAuthorization();  // Потом авторизация
 app.MapControllers();
 
 app.Run();
+
+public partial class Program { }
