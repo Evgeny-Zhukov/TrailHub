@@ -361,3 +361,45 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Angular specific
+.angular/
+dist/
+out-tsc/
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs for Angular/Web
+.code/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ASP.NET Core specific
+appsettings.Development.json # Если там есть чувствительные данные, лучше не давать модели
+*.user
+*.dbmdl
+*.log
+
+# Entity Framework Migrations (опционально, если хотите, чтобы модель видела только текущую схему, а не историю изменений)
+# Migrations/ 
+
+# Project Trail specific content
+wwwroot/uploads/
+wwwroot/images/trails/
+*.gpx
+*.kml
+*.geojson
+Media/
+Assets/Raw/
+
+# Secrets & Environment
+.env
+appsettings.Production.json
+secrets.json
+*.pfx
+*.pem
